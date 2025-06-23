@@ -630,24 +630,11 @@
         taskHeader.textContent = 'Tasks';
         header.appendChild(taskHeader);
         // Day headers
-// Set your project start date here (year, monthIndex, day)
-// Example: June 10, 2025 (JS months are 0-based)
-const projectStartDate = new Date(2025, 5, 10); // June 10, 2025
-
-const dayNames = ['Sun.', 'Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.'];
-
-// In generateTimeline, replace the day headers loop with:
-for (let day = 1; day <= 20; day++) {
-    const thisDate = new Date(projectStartDate);
-    thisDate.setDate(projectStartDate.getDate() + day - 1);
-    const dayOfWeek = dayNames[thisDate.getDay()];
-    const dayOfMonth = thisDate.getDate();
-    const label = `${dayOfWeek} ${dayOfMonth}`;
-    const dayHeader = document.createElement('div');
-    dayHeader.className = `header-cell ${day === currentDay ? 'current-day' : ''}`;
-    dayHeader.textContent = label;
-    header.appendChild(dayHeader);
-}
+        for (let day = 1; day <= 20; day++) {
+            const dayHeader = document.createElement('div');
+            dayHeader.className = `header-cell ${day === currentDay ? 'current-day' : ''}`;
+            dayHeader.textContent = `Day ${day}`;
+            header.appendChild(dayHeader);
         }
         grid.appendChild(header);
         // Create task rows
