@@ -37,6 +37,10 @@
         .delete-btn:hover { background: #fee2e2; }
         .editable { cursor: pointer; border-bottom: 1px dotted #2563eb; }
         .edit-input { width: 90%; font-size: inherit; font-family: inherit; padding: 2px 4px; border: 1px solid #a3a3a3; border-radius: 3px; }
+        .crew-edit-input { width: 60px; font-size: inherit; font-family: inherit; padding: 2px 4px; border: 1px solid #a3a3a3; border-radius: 3px; }
+        .color-input { width: 30px; height: 20px; border: none; background: none; padding: 0; }
+        .add-crew-btn { margin-top: 10px; width: 100%; background: #dbeafe; color: #1d4ed8; border: none; border-radius: 4px; padding: 5px 0; font-size: 14px; cursor: pointer; }
+        .add-crew-btn:hover { background: #a7f3d0; color: #166534; }
         .day-cell { border-right: 1px solid #e5e7eb; position: relative; cursor: pointer; transition: background-color 0.2s; }
         .day-cell:hover { background: #f0f9ff; }
         .day-cell.drop-target { background: #dbeafe !important; border: 2px dashed #2563eb; }
@@ -53,11 +57,12 @@
         .panel { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .panel-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; color: #333; }
         .crew-item { margin-bottom: 15px; padding: 12px; border-radius: 6px; border-left: 4px solid; }
-        .crew-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .crew-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
         .crew-name { font-weight: bold; }
         .efficiency-score { font-size: 14px; font-weight: bold; }
         .efficiency-score.good { color: #16a34a; }
         .efficiency-score.poor { color: #dc2626; }
+        .crew-delete-btn { background: none; border: none; color: #dc2626; font-size: 17px; cursor: pointer; }
         .progress-bar { width: 100%; height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
         .progress-fill { height: 100%; transition: width 0.3s ease; }
         .task-summary { margin-bottom: 10px; padding: 10px; border-radius: 4px; font-size: 14px; }
@@ -116,8 +121,9 @@
             </div>
             <div class="sidebar">
                 <div class="panel">
-                    <h3 class="panel-title">👥 Crew Performance</h3>
+                    <div class="panel-title editable" id="crew-title" onclick="editCrewTitle()"></div>
                     <div id="crew-performance"></div>
+                    <button class="add-crew-btn" onclick="addCrew()">➕ Add Crew</button>
                 </div>
                 <div class="panel">
                     <h3 class="panel-title">📋 Task Overview</h3>
@@ -135,6 +141,7 @@
         </div>
     </div>
     <script>
+        let crewPanelTitle = "👥 Crew Performance";
         let tasks = [
             { id: 'task-1', name: 'Framing', crew: 'Crew A', duration: 3, startDay: 1, priority: 'high', status: 'in-progress', efficiency: 85 },
             { id: 'task-2', name: 'Electrical', crew: 'Crew B', duration: 2, startDay: 3, priority: 'medium', status: 'scheduled', efficiency: 70 },
@@ -143,7 +150,7 @@
             { id: 'task-5', name: 'Flooring', crew: 'Crew D', duration: 3, startDay: 10, priority: 'medium', status: 'scheduled', efficiency: 80 },
             { id: 'task-6', name: 'Painting', crew: 'Crew B', duration: 2, startDay: 11, priority: 'low', status: 'scheduled', efficiency: 75 }
         ];
-        const crews = [
+        let crews = [
             { id: 'crew-a', name: 'Crew A', efficiency: 75, color: '#ff6b6b' },
             { id: 'crew-b', name: 'Crew B', efficiency: 70, color: '#4ecdc4' },
             { id: 'crew-c', name: 'Crew C', efficiency: 90, color: '#45b7d1' },
@@ -179,7 +186,6 @@
                 const row = document.createElement('div');
                 row.className = 'task-row';
                 row.dataset.taskId = task.id;
-                // Task info with editable fields
                 const taskInfo = document.createElement('div');
                 taskInfo.className = 'task-info';
                 taskInfo.innerHTML = `
@@ -261,32 +267,12 @@
             block.addEventListener('dragend', handleDragEnd);
             return block;
         }
-        function handleDragStart(e) {
-            draggedTask = e.target.dataset.taskId;
-            draggedElement = e.target;
-            e.dataTransfer.effectAllowed = 'move';
-            e.target.style.opacity = '0.5';
-        }
-        function handleDragEnd(e) { e.target.style.opacity = ''; }
-        function handleDragEnter(e) { if (e.target.classList.contains('day-cell')) e.preventDefault(); }
-        function handleDragOver(e) { if (e.target.classList.contains('day-cell')) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.target.classList.add('drop-target'); } }
-        function handleDragLeave(e) { if (e.target.classList.contains('day-cell')) e.target.classList.remove('drop-target'); }
-        function handleDrop(e) {
-            e.preventDefault(); e.target.classList.remove('drop-target');
-            if (!draggedTask || !e.target.classList.contains('day-cell')) return;
-            const newDay = parseInt(e.target.dataset.day);
-            const targetTaskId = e.target.dataset.taskId;
-            const task = tasks.find(t => t.id === draggedTask);
-            if (task && newDay && targetTaskId === task.id) {
-                task.startDay = newDay;
-                generateTimeline(); updateSidebar(); updateStats();
-            }
-            draggedTask = null; draggedElement = null;
-        }
+        // Crew Performance Editable Section
         function generateCrewPerformance() {
+            document.getElementById('crew-title').innerHTML = crewPanelTitle;
             const container = document.getElementById('crew-performance');
             container.innerHTML = '';
-            crews.forEach(crew => {
+            crews.forEach((crew, idx) => {
                 const crewTasks = tasks.filter(t => t.crew === crew.name);
                 const avgEfficiency = crewTasks.length > 0 
                     ? Math.round(crewTasks.reduce((sum, t) => sum + t.efficiency, 0) / crewTasks.length)
@@ -295,12 +281,100 @@
                 crewDiv.className = 'crew-item';
                 crewDiv.style.borderLeftColor = crew.color;
                 crewDiv.style.backgroundColor = crew.color + '20';
-                crewDiv.innerHTML = `<div class="crew-header"><span class="crew-name">${crew.name}</span>
-                        <span class="efficiency-score ${avgEfficiency < 70 ? 'poor' : 'good'}">
-                            ${avgEfficiency}% ${avgEfficiency < 70 ? '⚠️' : ''}</span></div>
-                    <div class="progress-bar"><div class="progress-fill" style="width: ${avgEfficiency}%; background-color: ${avgEfficiency < 70 ? '#dc2626' : crew.color};"></div></div>`;
+                crewDiv.innerHTML = `
+                    <div class="crew-header">
+                        <span class="crew-name editable" onclick="editCrewField(event, ${idx}, 'name')">${crew.name}</span>
+                        <input class="color-input" type="color" value="${crew.color}" onchange="editCrewColor(${idx}, this.value)">
+                        <span class="efficiency-score ${avgEfficiency < 70 ? 'poor' : 'good'} editable" onclick="editCrewField(event, ${idx}, 'efficiency')">
+                            ${avgEfficiency}%
+                            ${avgEfficiency < 70 ? '⚠️' : ''}
+                        </span>
+                        <button class="crew-delete-btn" title="Delete Crew" onclick="deleteCrew(${idx})">🗑️</button>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${avgEfficiency}%; background-color: ${avgEfficiency < 70 ? '#dc2626' : crew.color};"></div>
+                    </div>
+                `;
                 container.appendChild(crewDiv);
             });
+        }
+        function editCrewTitle() {
+            const el = document.getElementById('crew-title');
+            const oldValue = crewPanelTitle;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = oldValue;
+            input.className = 'edit-input';
+            input.onblur = finish;
+            input.onkeydown = ev => {
+                if (ev.key === 'Enter') input.blur();
+                if (ev.key === 'Escape') { input.value = oldValue; input.blur(); }
+            };
+            el.replaceWith(input);
+            input.focus(); input.select();
+            function finish() {
+                crewPanelTitle = input.value.trim() === "" ? "👥 Crew Performance" : input.value.trim();
+                generateCrewPerformance();
+            }
+        }
+        function editCrewField(e, idx, field) {
+            e.stopPropagation();
+            const crew = crews[idx];
+            const div = e.target;
+            const oldValue = crew[field];
+            const input = document.createElement('input');
+            input.type = (field === "efficiency") ? "number" : "text";
+            input.value = oldValue;
+            input.className = 'crew-edit-input';
+            input.min = (field === "efficiency") ? "0" : undefined;
+            input.max = (field === "efficiency") ? "100" : undefined;
+            input.onblur = finish;
+            input.onkeydown = ev => {
+                if (ev.key === 'Enter') input.blur();
+                if (ev.key === 'Escape') { input.value = oldValue; input.blur(); }
+            };
+            div.replaceWith(input);
+            input.focus(); input.select();
+            function finish() {
+                if(field === "efficiency") {
+                    let val = parseInt(input.value);
+                    if(isNaN(val) || val < 0) val = 0;
+                    if(val > 100) val = 100;
+                    crew[field] = val;
+                } else {
+                    crew[field] = input.value.trim() === "" ? oldValue : input.value.trim();
+                }
+                generateCrewPerformance();
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+            }
+        }
+        function editCrewColor(idx, val) {
+            crews[idx].color = val;
+            generateCrewPerformance();
+            generateTimeline();
+        }
+        function deleteCrew(idx) {
+            if(confirm("Delete this crew? All tasks assigned to this crew will remain but reference a deleted crew.")) {
+                crews.splice(idx, 1);
+                generateCrewPerformance();
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+            }
+        }
+        function addCrew() {
+            const name = prompt("Crew name:");
+            if (!name) return;
+            let color = prompt("Crew color (hex, e.g. #ff0000):", "#cccccc");
+            if (!/^#([0-9a-f]{3}){1,2}$/i.test(color)) color = "#cccccc";
+            let efficiency = parseInt(prompt("Efficiency (0-100):", "80"));
+            if(isNaN(efficiency) || efficiency < 0) efficiency = 0;
+            if(efficiency > 100) efficiency = 100;
+            const id = "crew-" + Date.now();
+            crews.push({id, name, efficiency, color});
+            generateCrewPerformance();
         }
         function generateTaskOverview() {
             const container = document.getElementById('task-overview');
@@ -445,6 +519,11 @@
         window.optimizeSchedule = optimizeSchedule;
         window.editField = editField;
         window.deleteTask = deleteTask;
+        window.editCrewField = editCrewField;
+        window.editCrewColor = editCrewColor;
+        window.deleteCrew = deleteCrew;
+        window.editCrewTitle = editCrewTitle;
+        window.addCrew = addCrew;
         window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
