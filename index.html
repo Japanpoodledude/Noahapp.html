@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Schedule Optimizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .btn-primary {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #16a34a;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .schedule-section {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .schedule-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .schedule-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .schedule-subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .timeline {
+            overflow-x: auto;
+            min-height: 400px;
+        }
+        
+        .timeline-grid {
+            display: grid;
+            min-width: 1200px;
+        }
+        
+        .timeline-header {
+            display: grid;
+            grid-template-columns: 150px repeat(20, 60px);
+            background: #f3f4f6;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .header-cell {
+            padding: 10px 5px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 12px;
+            border-right: 1px solid #e5e7eb;
+        }
+        
+        .header-cell.current-day {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .task-row {
+            display: grid;
+            grid-template-columns: 150px repeat(20, 60px);
+            border-bottom: 1px solid #e5e7eb;
+            min-height: 60px;
+        }
+        
+        .task-row:hover {
+            background: #f9fafb;
+        }
+        
+        .task-info {
+            padding: 10px;
+            border-right: 1px solid #e5e7eb;
+            background: #fafafa;
+        }
+        
+        .task-name {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+        
+        .task-crew {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .day-cell {
+            border-right: 1px solid #e5e7eb;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .day-cell:hover {
+            background: #f0f9ff;
+        }
+        
+        .day-cell.drop-target {
+            background: #dbeafe !important;
+            border: 2px dashed #2563eb;
+        }
+        
+        .task-block {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: move;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-left: 4px solid rgba(255,255,255,0.3);
+            z-index: 10;
+        }
+        
+        .task-block:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 20;
+        }
+        
+        .task-block.delayed {
+            border-left-color: #dc2626 !important;
+            animation: pulse 2s infinite;
+        }
+        
+        .task-block.low-efficiency {
+            border-left-color: #f59e0b !important;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .task-block-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .task-block-details {
+            font-size: 10px;
+            opacity: 0.9;
+        }
+        
+        .warning-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #dc2626;
+            color: white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        
+        .efficiency-badge {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            background: #f59e0b;
+            color: white;
+            font-size: 9px;
+            padding: 1px 3px;
+            border-radius: 2px;
+        }
+        
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .panel-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .crew-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        
+        .crew-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .crew-name {
+            font-weight: bold;
+        }
+        
+        .efficiency-score {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .efficiency-score.good {
+            color: #16a34a;
+        }
+        
+        .efficiency-score.poor {
+            color: #dc2626;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        .task-summary {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .task-summary.normal {
+            background: #f9fafb;
+        }
+        
+        .task-summary.delayed {
+            background: #fef2f2;
+            border-left: 3px solid #dc2626;
+        }
+        
+        .task-summary-name {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .task-summary-details {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .delayed-warning {
+            color: #dc2626;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+        
+        .quick-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        
+        .action-btn.blue {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+        
+        .action-btn.blue:hover {
+            background: #dbeafe;
+        }
+        
+        .action-btn.green {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        
+        .action-btn.green:hover {
+            background: #dcfce7;
+        }
+        
+        .action-btn.gray {
+            background: #f9fafb;
+            color: #374151;
+        }
+        
+        .action-btn.gray:hover {
+            background: #f3f4f6;
+        }
+        
+        .optimizer-panel {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .optimizer-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #166534;
+            margin-bottom: 10px;
+        }
+        
+        .optimizer-description {
+            color: #166534;
+            margin-bottom: 15px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        /* Ensure task blocks span multiple days correctly */
+        .task-block-multi {
+            position: absolute;
+            top: 5px;
+            bottom: 5px;
+            border-radius: 4px;
+            padding: 8px;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: move;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-left: 4px solid rgba(255,255,255,0.3);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-top">
+                <h1 class="title">📅 Production Schedule Optimizer</h1>
+                <div>
+                    <button class="btn btn-success" onclick="toggleOptimizer()">⚙️ Auto Optimize</button>
+                </div>
+            </div>
+            <div class="stats">
+                <div>🕐 Current Day: <span id="current-day">5</span></div>
+                <div>⚠️ Delayed Tasks: <span id="delayed-count">0</span></div>
+                <div>📉 Low Efficiency: <span id="low-efficiency-count">0</span></div>
+            </div>
+        </div>
+
+        <!-- Optimizer Panel -->
+        <div id="optimizer-panel" class="optimizer-panel hidden">
+            <h3 class="optimizer-title">Schedule Optimization</h3>
+            <p class="optimizer-description">
+                This will automatically reorganize tasks based on crew efficiency, priorities, and dependencies.
+            </p>
+            <button class="btn btn-success" onclick="optimizeSchedule()">Optimize Now</button>
+            <button class="btn btn-secondary" onclick="toggleOptimizer()">Cancel</button>
+        </div>
+
+        <div class="main-content">
+            <!-- Main Schedule -->
+            <div class="schedule-section">
+                <div class="schedule-header">
+                    <h2 class="schedule-title">Production Timeline</h2>
+                    <p class="schedule-subtitle">Drag tasks to reschedule them</p>
+                </div>
+                <div class="timeline">
+                    <div class="timeline-grid" id="timeline-grid">
+                        <!-- Timeline content will be generated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Crew Performance -->
+                <div class="panel">
+                    <h3 class="panel-title">👥 Crew Performance</h3>
+                    <div id="crew-performance">
+                        <!-- Crew performance will be generated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Task Overview -->
+                <div class="panel">
+                    <h3 class="panel-title">📋 Task Overview</h3>
+                    <div id="task-overview">
+                        <!-- Task overview will be generated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="panel">
+                    <h3 class="panel-title">⚡ Quick Actions</h3>
+                    <div class="quick-actions">
+                        <button class="action-btn blue" onclick="addNewTask()">➕ Add Task</button>
+                        <button class="action-btn green" onclick="saveSchedule()">💾 Save Schedule</button>
+                        <button class="action-btn gray" onclick="exportSchedule()">📥 Export PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data
+        let tasks = [
+            {
+                id: 'task-1',
+                name: 'Framing',
+                crew: 'Crew A',
+                duration: 3,
+                startDay: 1,
+                priority: 'high',
+                status: 'in-progress',
+                efficiency: 85
+            },
+            {
+                id: 'task-2',
+                name: 'Electrical',
+                crew: 'Crew B',
+                duration: 2,
+                startDay: 3,
+                priority: 'medium',
+                status: 'scheduled',
+                efficiency: 70
+            },
+            {
+                id: 'task-3',
+                name: 'Plumbing',
+                crew: 'Crew C',
+                duration: 2,
+                startDay: 3,
+                priority: 'medium',
+                status: 'scheduled',
+                efficiency: 90
+            },
+            {
+                id: 'task-4',
+                name: 'Drywall',
+                crew: 'Crew A',
+                duration: 4,
+                startDay: 6,
+                priority: 'high',
+                status: 'scheduled',
+                efficiency: 60
+            },
+            {
+                id: 'task-5',
+                name: 'Flooring',
+                crew: 'Crew D',
+                duration: 3,
+                startDay: 10,
+                priority: 'medium',
+                status: 'scheduled',
+                efficiency: 80
+            },
+            {
+                id: 'task-6',
+                name: 'Painting',
+                crew: 'Crew B',
+                duration: 2,
+                startDay: 11,
+                priority: 'low',
+                status: 'scheduled',
+                efficiency: 75
+            }
+        ];
+
+        const crews = [
+            { id: 'crew-a', name: 'Crew A', efficiency: 75, color: '#ff6b6b' },
+            { id: 'crew-b', name: 'Crew B', efficiency: 70, color: '#4ecdc4' },
+            { id: 'crew-c', name: 'Crew C', efficiency: 90, color: '#45b7d1' },
+            { id: 'crew-d', name: 'Crew D', efficiency: 80, color: '#96ceb4' }
+        ];
+
+        let currentDay = 5;
+        let draggedTask = null;
+        let draggedElement = null;
+
+        // Generate timeline
+        function generateTimeline() {
+            const grid = document.getElementById('timeline-grid');
+            grid.innerHTML = '';
+
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'timeline-header';
+            
+            // Task header
+            const taskHeader = document.createElement('div');
+            taskHeader.className = 'header-cell';
+            taskHeader.textContent = 'Tasks';
+            header.appendChild(taskHeader);
+
+            // Day headers
+            for (let day = 1; day <= 20; day++) {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = `header-cell ${day === currentDay ? 'current-day' : ''}`;
+                dayHeader.textContent = `Day ${day}`;
+                header.appendChild(dayHeader);
+            }
+            grid.appendChild(header);
+
+            // Create task rows
+            tasks.forEach(task => {
+                const row = document.createElement('div');
+                row.className = 'task-row';
+                row.dataset.taskId = task.id;
+
+                // Task info
+                const taskInfo = document.createElement('div');
+                taskInfo.className = 'task-info';
+                taskInfo.innerHTML = `
+                    <div class="task-name">${task.name}</div>
+                    <div class="task-crew">${task.crew}</div>
+                `;
+                row.appendChild(taskInfo);
+
+                // Day cells
+                for (let day = 1; day <= 20; day++) {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'day-cell';
+                    dayCell.dataset.day = day;
+                    dayCell.dataset.taskId = task.id;
+
+                    // Add task block if this is the start day
+                    if (day === task.startDay) {
+                        const taskBlock = createTaskBlock(task);
+                        dayCell.appendChild(taskBlock);
+                    }
+
+                    // Add drag and drop handlers
+                    dayCell.addEventListener('dragover', handleDragOver);
+                    dayCell.addEventListener('drop', handleDrop);
+                    dayCell.addEventListener('dragleave', handleDragLeave);
+                    dayCell.addEventListener('dragenter', handleDragEnter);
+
+                    row.appendChild(dayCell);
+                }
+
+                grid.appendChild(row);
+            });
+        }
+
+        function createTaskBlock(task) {
+            const block = document.createElement('div');
+            block.className = 'task-block';
+            block.draggable = true;
+            block.dataset.taskId = task.id;
+            block.id = `task-block-${task.id}`;
+
+            const crew = crews.find(c => c.name === task.crew);
+            block.style.backgroundColor = crew ? crew.color : '#999';
+            
+            // Calculate block width to span multiple days
+            const width = task.duration * 60 - 10; // 60px per day minus padding
+            block.style.width = `${width}px`;
+
+            const isDelayed = task.startDay + task.duration - 1 < currentDay && task.status !== 'completed';
+            const isLowEfficiency = task.efficiency < 70;
+
+            if (isDelayed) block.classList.add('delayed');
+            if (isLowEfficiency) block.classList.add('low-efficiency');
+
+            block.innerHTML = `
+                <div class="task-block-name">${task.name}</div>
+                <div class="task-block-details">
+                    <div>${task.crew}</div>
+                    <div>${task.duration}d</div>
+                </div>
+                ${isDelayed ? '<div class="warning-badge">!</div>' : ''}
+                ${isLowEfficiency ? `<div class="efficiency-badge">${task.efficiency}%</div>` : ''}
+            `;
+
+            block.addEventListener('dragstart', handleDragStart);
+            block.addEventListener('dragend', handleDragEnd);
+            return block;
+        }
+
+        function handleDragStart(e) {
+            draggedTask = e.target.dataset.taskId;
+            draggedElement = e.target;
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.style.opacity = '0.5';
+        }
+
+        function handleDragEnd(e) {
+            e.target.style.opacity = '';
+        }
+
+        function handleDragEnter(e) {
+            if (e.target.classList.contains('day-cell')) {
+                e.preventDefault();
+            }
+        }
+
+        function handleDragOver(e) {
+            if (e.target.classList.contains('day-cell')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                e.target.classList.add('drop-target');
+            }
+        }
+
+        function handleDragLeave(e) {
+            if (e.target.classList.contains('day-cell')) {
+                e.target.classList.remove('drop-target');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drop-target');
+
+            if (!draggedTask || !e.target.classList.contains('day-cell')) return;
+
+            const newDay = parseInt(e.target.dataset.day);
+            const targetTaskId = e.target.dataset.taskId;
+            const task = tasks.find(t => t.id === draggedTask);
+
+            if (task && newDay && targetTaskId === task.id) {
+                task.startDay = newDay;
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+            }
+
+            draggedTask = null;
+            draggedElement = null;
+        }
+
+        function generateCrewPerformance() {
+            const container = document.getElementById('crew-performance');
+            container.innerHTML = '';
+
+            crews.forEach(crew => {
+                const crewTasks = tasks.filter(t => t.crew === crew.name);
+                const avgEfficiency = crewTasks.length > 0 
+                    ? Math.round(crewTasks.reduce((sum, t) => sum + t.efficiency, 0) / crewTasks.length)
+                    : crew.efficiency;
+
+                const crewDiv = document.createElement('div');
+                crewDiv.className = 'crew-item';
+                crewDiv.style.borderLeftColor = crew.color;
+                crewDiv.style.backgroundColor = crew.color + '20';
+
+                crewDiv.innerHTML = `
+                    <div class="crew-header">
+                        <span class="crew-name">${crew.name}</span>
+                        <span class="efficiency-score ${avgEfficiency < 70 ? 'poor' : 'good'}">
+                            ${avgEfficiency}% ${avgEfficiency < 70 ? '⚠️' : ''}
+                        </span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${avgEfficiency}%; background-color: ${avgEfficiency < 70 ? '#dc2626' : crew.color};"></div>
+                    </div>
+                `;
+
+                container.appendChild(crewDiv);
+            });
+        }
+
+        function generateTaskOverview() {
+            const container = document.getElementById('task-overview');
+            container.innerHTML = '';
+
+            tasks.forEach(task => {
+                const isDelayed = task.startDay + task.duration - 1 < currentDay && task.status !== 'completed';
+
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `task-summary ${isDelayed ? 'delayed' : 'normal'}`;
+
+                taskDiv.innerHTML = `
+                    <div class="task-summary-name">${task.name}</div>
+                    <div class="task-summary-details">
+                        <span>${task.crew}</span>
+                        <span>${task.efficiency}% efficiency</span>
+                    </div>
+                    ${isDelayed ? '<div class="delayed-warning">⚠️ Behind Schedule</div>' : ''}
+                `;
+
+                container.appendChild(taskDiv);
+            });
+        }
+
+        function updateStats() {
+            const delayedTasks = tasks.filter(t => t.startDay + t.duration - 1 < currentDay && t.status !== 'completed').length;
+            const lowEfficiencyTasks = tasks.filter(t => t.efficiency < 70).length;
+
+            document.getElementById('current-day').textContent = currentDay;
+            document.getElementById('delayed-count').textContent = delayedTasks;
+            document.getElementById('low-efficiency-count').textContent = lowEfficiencyTasks;
+        }
+
+        function updateSidebar() {
+            generateCrewPerformance();
+            generateTaskOverview();
+        }
+
+        function toggleOptimizer() {
+            const panel = document.getElementById('optimizer-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function optimizeSchedule() {
+            // Create a deep copy of tasks for optimization
+            let optimizedTasks = JSON.parse(JSON.stringify(tasks));
+            
+            // Sort by priority and efficiency
+            optimizedTasks.sort((a, b) => {
+                const priorityWeight = { high: 3, medium: 2, low: 1 };
+                const priorityDiff = priorityWeight[b.priority] - priorityWeight[a.priority];
+                if (priorityDiff !== 0) return priorityDiff;
+                return b.efficiency - a.efficiency;
+            });
+            
+            // Reset all start days and reassign sequentially
+            let nextAvailableDay = 1;
+            const crewSchedules = {};
+            
+            optimizedTasks.forEach(task => {
+                // Find when crew is available
+                const crewAvailable = crewSchedules[task.crew] || 1;
+                task.startDay = Math.max(nextAvailableDay, crewAvailable);
+                
+                // Update crew schedule
+                crewSchedules[task.crew] = task.startDay + task.duration;
+                
+                // Find the most efficient available crew
+                const bestCrew = crews.reduce((best, crew) => {
+                    const crewEndDay = crewSchedules[crew.name] || 1;
+                    if (crewEndDay <= task.startDay && crew.efficiency > best.efficiency) {
+                        return crew;
+                    }
+                    return best;
+                }, { efficiency: 0 });
+                
+                if (bestCrew.name) {
+                    task.crew = bestCrew.name;
+                    task.efficiency = Math.min(100, task.efficiency + 10); // Boost efficiency
+                }
+            });
+            
+            tasks = optimizedTasks;
+            generateTimeline();
+            updateSidebar();
+            updateStats();
+            toggleOptimizer();
+            alert('Schedule optimized! Tasks reorganized based on priorities and crew efficiency.');
+        }
+
+        function addNewTask() {
+            const taskName = prompt('Enter task name:');
+            if (taskName) {
+                const crewName = prompt('Select crew (Crew A, Crew B, Crew C, or Crew D):', 'Crew A');
+                const duration = parseInt(prompt('Enter duration in days:', '2')) || 2;
+                const priority = prompt('Enter priority (high, medium, or low):', 'medium') || 'medium';
+                
+                const newTask = {
+                    id: 'task-' + Date.now(),
+                    name: taskName,
+                    crew: crewName,
+                    duration: duration,
+                    startDay: currentDay + 1,
+                    priority: priority.toLowerCase(),
+                    status: 'scheduled',
+                    efficiency: 75 + Math.floor(Math.random() * 20)
+                };
+                
+                tasks.push(newTask);
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+            }
+        }
+
+        function saveSchedule() {
+            const scheduleData = {
+                currentDay: currentDay,
+                tasks: tasks,
+                crews: crews,
+                savedAt: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(scheduleData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'production-schedule-' + new Date().toISOString().split('T')[0] + '.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+
+        function exportSchedule() {
+            // Create a simple text report
+            let report = 'PRODUCTION SCHEDULE REPORT\n';
+            report += '==========================\n\n';
+            report += `Generated: ${new Date().toLocaleString()}\n`;
+            report += `Current Day: ${currentDay}\n\n`;
+            
+            report += 'TASK SCHEDULE:\n';
+            report += '--------------\n';
+            
+            tasks.sort((a, b) => a.startDay - b.startDay).forEach(task => {
+                const endDay = task.startDay + task.duration - 1;
+                const status = task.startDay + task.duration - 1 < currentDay ? 'DELAYED' : 'On Schedule';
+                report += `${task.name} (${task.crew})\n`;
+                report += `  Days: ${task.startDay} - ${endDay} (${task.duration} days)\n`;
+                report += `  Priority: ${task.priority}\n`;
+                report += `  Efficiency: ${task.efficiency}%\n`;
+                report += `  Status: ${status}\n\n`;
+            });
+            
+            report += '\nCREW PERFORMANCE:\n';
+            report += '-----------------\n';
+            
+            crews.forEach(crew => {
+                const crewTasks = tasks.filter(t => t.crew === crew.name);
+                const avgEfficiency = crewTasks.length > 0 
+                    ? Math.round(crewTasks.reduce((sum, t) => sum + t.efficiency, 0) / crewTasks.length)
+                    : crew.efficiency;
+                
+                report += `${crew.name}: ${avgEfficiency}% average efficiency\n`;
+                report += `  Tasks: ${crewTasks.map(t => t.name).join(', ') || 'None'}\n\n`;
+            });
+            
+            // Download as text file
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'production-schedule-report-' + new Date().toISOString().split('T')[0] + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('Schedule report exported successfully!');
+        }
+
+        // Initialize the app
+        function init() {
+            generateTimeline();
+            updateSidebar();
+            updateStats();
+        }
+
+        // Start the app when page loads
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
