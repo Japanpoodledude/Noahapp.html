@@ -563,19 +563,17 @@
 
             // Day headers
             for (let day = 1; day <= 20; day++) {
-                // === NEW: Calculate real date and label ===
-                const thisDate = new Date(projectStartDate);
-                thisDate.setDate(projectStartDate.getDate() + (day - 1));
-                const dayOfWeek = dayNames[thisDate.getDay()];
-                const dayOfMonth = thisDate.getDate();
-                const label = `${dayOfWeek} ${dayOfMonth}`;
-                // === END NEW ===
+    const thisDate = new Date(projectStartDate);
+    thisDate.setDate(projectStartDate.getDate() + (day - 1));
+    const dayOfWeek = dayNames[thisDate.getDay()];
+    const dayOfMonth = thisDate.getDate();
+    const label = `${dayOfWeek} ${dayOfMonth}`;
 
-                const dayHeader = document.createElement('div');
-                dayHeader.className = `header-cell ${day === currentDay ? 'current-day' : ''}`;
-                dayHeader.textContent = label;
-                header.appendChild(dayHeader);
-            }
+    const dayHeader = document.createElement('div');
+    dayHeader.className = `header-cell ${day === currentDay ? 'current-day' : ''}`;
+    dayHeader.textContent = label;
+    header.appendChild(dayHeader);
+}
             grid.appendChild(header);
 
             // Create task rows
