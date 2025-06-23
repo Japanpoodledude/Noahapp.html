@@ -602,6 +602,39 @@
         let draggedTask = null;
         let draggedElement = null;
 
+        const STORAGE_KEY = 'production-schedule-data';
+
+function saveToLocalStorage() {
+    const scheduleData = {
+        currentDay: currentDay,
+        tasks: tasks,
+        crews: crews,
+        savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(scheduleData));
+}
+
+function loadFromLocalStorage() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return false;
+    try {
+        const scheduleData = JSON.parse(data);
+        if (scheduleData.tasks) tasks = scheduleData.tasks;
+        if (scheduleData.crews) {
+            // Only update crew efficiencies if saved, else fallback to default
+            scheduleData.crews.forEach(savedCrew => {
+                const crew = crews.find(c => c.name === savedCrew.name);
+                if (crew && savedCrew.efficiency) crew.efficiency = savedCrew.efficiency;
+            });
+        }
+        if (scheduleData.currentDay) currentDay = scheduleData.currentDay;
+        return true;
+    } catch (e) {
+        console.error('Failed to load schedule:', e);
+    }
+    return false;
+}
+
         // Generate timeline
         function generateTimeline() {
             const grid = document.getElementById('timeline-grid');
@@ -748,6 +781,7 @@
                 generateTimeline();
                 updateSidebar();
                 updateStats();
+                saveToLocalStorage();
             }
 
             draggedTask = null;
@@ -870,6 +904,7 @@
             generateTimeline();
             updateSidebar();
             updateStats();
+            saveToLocalStorage();
             toggleOptimizer();
             alert('Schedule optimized! Tasks reorganized based on priorities and crew efficiency.');
         }
@@ -896,6 +931,7 @@
                 generateTimeline();
                 updateSidebar();
                 updateStats();
+                saveToLocalStorage();
             }
         }
 
@@ -967,6 +1003,8 @@
 
         // Initialize the app
         function init() {
+            loadFromLocalStorage();
+            saveToLocalStorage();
             generateTimeline();
             updateSidebar();
             updateStats();
