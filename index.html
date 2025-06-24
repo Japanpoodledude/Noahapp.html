@@ -557,14 +557,9 @@
             const scheduleData = JSON.parse(data);
             if (scheduleData.tasks) tasks = scheduleData.tasks;
             if (scheduleData.crews) {
-                // Update crews by id, not by name, and update name and efficiency
                 scheduleData.crews.forEach(savedCrew => {
-                    const crew = crews.find(c => c.id === savedCrew.id);
-                    if (crew) {
-                        if (savedCrew.name) crew.name = savedCrew.name;
-                        if (savedCrew.efficiency) crew.efficiency = savedCrew.efficiency;
-                        if (savedCrew.color) crew.color = savedCrew.color;
-                    }
+                    const crew = crews.find(c => c.name === savedCrew.name);
+                    if (crew && savedCrew.efficiency) crew.efficiency = savedCrew.efficiency;
                 });
             }
             if (scheduleData.currentDay) currentDay = scheduleData.currentDay;
@@ -718,4 +713,290 @@
         if (isLowEfficiency) block.classList.add('low-efficiency');
         // The block name is also editable!
         block.innerHTML = `
-            <div class="task-block
+            <div class="task-block-header">
+                <span class="task-block-name" data-edit-task="${task.id}">${task.name}</span>
+                <button class="delete-btn" onclick="deleteTask('${task.id}'); event.stopPropagation(); event.preventDefault();" title="Delete">🗑️</button>
+            </div>
+            <div class="task-block-details">
+                <div class="task-block-crew" data-edit-crew="${task.id}">${task.crew}</div>
+                <div>${task.duration}d</div>
+            </div>
+            ${isDelayed ? '<div class="warning-badge">!</div>' : ''}
+            ${isLowEfficiency ? `<div class="efficiency-badge">${task.efficiency}%</div>` : ''}
+        `;
+        block.addEventListener('dragstart', handleDragStart);
+        block.addEventListener('dragend', handleDragEnd);
+        setTimeout(() => {
+            // Task name
+            const nameEl = block.querySelector('.task-block-name');
+            makeEditable(nameEl, val => {
+                task.name = val;
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+                saveToLocalStorage();
+            });
+            // Crew name
+            const crewEl = block.querySelector('.task-block-crew');
+            makeEditable(crewEl, val => {
+                task.crew = val;
+                generateTimeline();
+                updateSidebar();
+                updateStats();
+                saveToLocalStorage();
+            });
+        }, 0);
+        return block;
+    }
+
+    function handleDragStart(e) {
+        draggedTask = e.target.dataset.taskId;
+        draggedElement = e.target;
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.style.opacity = '0.5';
+    }
+    function handleDragEnd(e) {
+        e.target.style.opacity = '';
+    }
+    function handleDragEnter(e) {
+        if (e.target.classList.contains('day-cell')) {
+            e.preventDefault();
+        }
+    }
+    function handleDragOver(e) {
+        if (e.target.classList.contains('day-cell')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            e.target.classList.add('drop-target');
+        }
+    }
+    function handleDragLeave(e) {
+        if (e.target.classList.contains('day-cell')) {
+            e.target.classList.remove('drop-target');
+        }
+    }
+    function handleDrop(e) {
+        e.preventDefault();
+        e.target.classList.remove('drop-target');
+        if (!draggedTask || !e.target.classList.contains('day-cell')) return;
+        const newDay = parseInt(e.target.dataset.day);
+        const targetTaskId = e.target.dataset.taskId;
+        const task = tasks.find(t => t.id === draggedTask);
+        if (task && newDay && targetTaskId === task.id) {
+            task.startDay = newDay;
+            generateTimeline();
+            updateSidebar();
+            updateStats();
+            saveToLocalStorage();
+        }
+        draggedTask = null;
+        draggedElement = null;
+    }
+
+    function generateCrewPerformance() {
+        const container = document.getElementById('crew-performance');
+        container.innerHTML = '';
+        crews.forEach(crew => {
+            const crewTasks = tasks.filter(t => t.crew === crew.name);
+            const avgEfficiency = crewTasks.length > 0
+                ? Math.round(crewTasks.reduce((sum, t) => sum + t.efficiency, 0) / crewTasks.length)
+                : crew.efficiency;
+            const crewDiv = document.createElement('div');
+            crewDiv.className = 'crew-item';
+            crewDiv.style.borderLeftColor = crew.color;
+            crewDiv.style.backgroundColor = crew.color + '20';
+            crewDiv.innerHTML = `
+                <div class="crew-header">
+                    <span class="crew-name" data-crew-id="${crew.id}">${crew.name}</span>
+                    <span class="efficiency-score ${avgEfficiency < 70 ? 'poor' : 'good'}">
+                        ${avgEfficiency}% ${avgEfficiency < 70 ? '⚠️' : ''}
+                    </span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${avgEfficiency}%; background-color: ${avgEfficiency < 70 ? '#dc2626' : crew.color};"></div>
+                </div>
+            `;
+            container.appendChild(crewDiv);
+            // Make crew name editable
+            setTimeout(() => {
+                const crewNameEl = crewDiv.querySelector('.crew-name');
+                makeEditable(crewNameEl, val => {
+                    crew.name = val;
+                    // Update all tasks that reference old crew name
+                    tasks.forEach(t => {
+                        if (t.crew === crew.name) t.crew = val;
+                    });
+                    generateTimeline();
+                    generateCrewPerformance();
+                    updateSidebar();
+                    updateStats();
+                    saveToLocalStorage();
+                });
+            }, 0);
+        });
+    }
+
+    function generateTaskOverview() {
+        const container = document.getElementById('task-overview');
+        container.innerHTML = '';
+        tasks.forEach(task => {
+            const isDelayed = task.startDay + task.duration - 1 < currentDay && task.status !== 'completed';
+            const taskDiv = document.createElement('div');
+            taskDiv.className = `task-summary ${isDelayed ? 'delayed' : 'normal'}`;
+            taskDiv.innerHTML = `
+                <div class="task-summary-name">${task.name}</div>
+                <div class="task-summary-details">
+                    <span>${task.crew}</span>
+                    <span>${task.efficiency}% efficiency</span>
+                </div>
+                ${isDelayed ? '<div class="delayed-warning">⚠️ Behind Schedule</div>' : ''}
+            `;
+            container.appendChild(taskDiv);
+            // Make task name editable here too
+            setTimeout(() => {
+                const nameEl = taskDiv.querySelector('.task-summary-name');
+                makeEditable(nameEl, val => {
+                    task.name = val;
+                    generateTimeline();
+                    updateSidebar();
+                    updateStats();
+                    saveToLocalStorage();
+                });
+            }, 0);
+        });
+    }
+    function updateStats() {
+        const delayedTasks = tasks.filter(t => t.startDay + t.duration - 1 < currentDay && t.status !== 'completed').length;
+        const lowEfficiencyTasks = tasks.filter(t => t.efficiency < 70).length;
+        document.getElementById('current-day').textContent = currentDay;
+        document.getElementById('delayed-count').textContent = delayedTasks;
+        document.getElementById('low-efficiency-count').textContent = lowEfficiencyTasks;
+    }
+    function updateSidebar() {
+        generateCrewPerformance();
+        generateTaskOverview();
+    }
+    function toggleOptimizer() {
+        const panel = document.getElementById('optimizer-panel');
+        panel.classList.toggle('hidden');
+    }
+    function optimizeSchedule() {
+        let optimizedTasks = JSON.parse(JSON.stringify(tasks));
+        optimizedTasks.sort((a, b) => {
+            const priorityWeight = { high: 3, medium: 2, low: 1 };
+            const priorityDiff = priorityWeight[b.priority] - priorityWeight[a.priority];
+            if (priorityDiff !== 0) return priorityDiff;
+            return b.efficiency - a.efficiency;
+        });
+        let nextAvailableDay = 1;
+        const crewSchedules = {};
+        optimizedTasks.forEach(task => {
+            const crewAvailable = crewSchedules[task.crew] || 1;
+            task.startDay = Math.max(nextAvailableDay, crewAvailable);
+            crewSchedules[task.crew] = task.startDay + task.duration;
+            const bestCrew = crews.reduce((best, crew) => {
+                const crewEndDay = crewSchedules[crew.name] || 1;
+                if (crewEndDay <= task.startDay && crew.efficiency > best.efficiency) {
+                    return crew;
+                }
+                return best;
+            }, { efficiency: 0 });
+            if (bestCrew.name) {
+                task.crew = bestCrew.name;
+                task.efficiency = Math.min(100, task.efficiency + 10);
+            }
+        });
+        tasks = optimizedTasks;
+        generateTimeline();
+        updateSidebar();
+        updateStats();
+        saveToLocalStorage();
+        toggleOptimizer();
+        alert('Schedule optimized! Tasks reorganized based on priorities and crew efficiency.');
+    }
+    function addNewTask() {
+        const taskName = prompt('Enter task name:');
+        if (taskName) {
+            const crewName = prompt('Select crew (Crew A, Crew B, Crew C, or Crew D):', 'Crew A');
+            const duration = parseInt(prompt('Enter duration in days:', '2')) || 2;
+            const priority = prompt('Enter priority (high, medium, or low):', 'medium') || 'medium';
+            const newTask = {
+                id: 'task-' + Date.now(),
+                name: taskName,
+                crew: crewName,
+                duration: duration,
+                startDay: currentDay + 1,
+                priority: priority.toLowerCase(),
+                status: 'scheduled',
+                efficiency: 75 + Math.floor(Math.random() * 20)
+            };
+            tasks.push(newTask);
+            generateTimeline();
+            updateSidebar();
+            updateStats();
+            saveToLocalStorage();
+        }
+    }
+    function saveSchedule() {
+        saveToLocalStorage();
+        const scheduleData = {
+            currentDay: currentDay,
+            tasks: tasks,
+            crews: crews,
+            savedAt: new Date().toISOString()
+        };
+        const dataStr = JSON.stringify(scheduleData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        const exportFileDefaultName = 'production-schedule-' + new Date().toISOString().split('T')[0] + '.json';
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    }
+    function exportSchedule() {
+        let report = 'PRODUCTION SCHEDULE REPORT\n';
+        report += '==========================\n\n';
+        report += `Generated: ${new Date().toLocaleString()}\n`;
+        report += `Current Day: ${currentDay}\n\n`;
+        report += 'TASK SCHEDULE:\n';
+        report += '--------------\n';
+        tasks.sort((a, b) => a.startDay - b.startDay).forEach(task => {
+            const endDay = task.startDay + task.duration - 1;
+            const status = task.startDay + task.duration - 1 < currentDay ? 'DELAYED' : 'On Schedule';
+            report += `${task.name} (${task.crew})\n`;
+            report += `  Days: ${task.startDay} - ${endDay} (${task.duration} days)\n`;
+            report += `  Priority: ${task.priority}\n`;
+            report += `  Efficiency: ${task.efficiency}%\n`;
+            report += `  Status: ${status}\n\n`;
+        });
+        report += '\nCREW PERFORMANCE:\n';
+        report += '-----------------\n';
+        crews.forEach(crew => {
+            const crewTasks = tasks.filter(t => t.crew === crew.name);
+            const avgEfficiency = crewTasks.length > 0
+                ? Math.round(crewTasks.reduce((sum, t) => sum + t.efficiency, 0) / crewTasks.length)
+                : crew.efficiency;
+            report += `${crew.name}: ${avgEfficiency}% average efficiency\n`;
+            report += `  Tasks: ${crewTasks.map(t => t.name).join(', ') || 'None'}\n\n`;
+        });
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'production-schedule-report-' + new Date().toISOString().split('T')[0] + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert('Schedule report exported successfully!');
+    }
+    function init() {
+        loadFromLocalStorage();
+        generateTimeline();
+        updateSidebar();
+        updateStats();
+    }
+    window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
